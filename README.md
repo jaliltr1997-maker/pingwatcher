@@ -1,23 +1,6 @@
 # Ping Watcher Pro
 
-نسخه‌ی refactor شده با رویکرد **Clean Code** + UI جذاب‌تر برای مانیتورینگ لحظه‌ای کیفیت اینترنت.
-
-## امکانات جدید مهم
-
-- نمودار حرفه‌ای‌تر latency با:
-  - Grid و مقیاس خوانا
-  - Fill gradient زیر خط
-  - Marker خطاها (X قرمز)
-  - نمایش بصری بهتر وضعیت لحظه‌ای
-- تب جدید **DNS Monitor** برای مانیتورینگ DNSها به‌صورت:
-  - تکی (Load به تب Monitor)
-  - چندتایی (Start Selected / Start All)
-- لیست آماده DNSهای خارجی و داخلی در یکجا.
-
-## DNSهای پیش‌فرض
-
-- External: Google, Cloudflare, Quad9, OpenDNS
-- Internal: Shecan, Radar, Electro, Local Gateway
+نسخه‌ی refactor شده با رویکرد **Clean Code** و معماری ماژولار.
 
 ## ساختار جدید پروژه
 
@@ -25,10 +8,18 @@
 - `pingwatcher/settings.py`: مدیریت تنظیمات و persistence
 - `pingwatcher/ping.py`: ساخت دستور ping + parser + worker thread
 - `pingwatcher/widgets.py`: ویجت‌های قابل‌استفاده مجدد (نمودار و پنل آمار)
-- `pingwatcher/dns.py`: لیست DNSهای داخلی/خارجی
 - `pingwatcher/main_window.py`: orchestration لایه‌ی UI و رفتارها
 - `pingwatcher/app.py`: entrypoint اپلیکیشن
 - `ping_watcher.py`: اجرای مستقیم برنامه (backward-compatible)
+
+## ویژگی‌ها
+
+- کد تمیزتر، کلاس‌های کوچک‌تر و مسئولیت‌های واضح‌تر.
+- سازگاری بهتر ping بین Windows/Linux/macOS و محیط‌های Android-like.
+- نمودار latency + نمایش failure marker.
+- آمار کامل: total/success/failed/rate/avg/min/max/jitter.
+- تاریخچه با خروجی CSV/JSON.
+- تنظیمات پایدار در `~/.ping_watcher_settings.json`.
 
 ## اجرا
 
