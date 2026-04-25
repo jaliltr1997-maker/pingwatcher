@@ -4,6 +4,11 @@
 
 ## ساختار جدید پروژه
 
+## نسخه‌های Release
+
+- **Desktop (Python / PyQt):** `v1.1.0`
+- **Android (Flutter):** `v1.1.0+2`
+
 - `pingwatcher/models.py`: مدل‌های داده (`PingResult`, `MonitoringStats`)
 - `pingwatcher/settings.py`: مدیریت تنظیمات و persistence
 - `pingwatcher/ping.py`: ساخت دستور ping + parser + worker thread
