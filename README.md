@@ -1,39 +1,27 @@
 # Ping Watcher Pro
 
-این ریپو الان دو بخش دارد:
+نسخه‌ی refactor شده با رویکرد **Clean Code** و معماری ماژولار.
 
-1. **نسخه دسکتاپ PyQt** (پوشه `pingwatcher/` + `ping_watcher.py`)
-2. **نسخه اندروید Flutter** با UI/UX مدرن (پوشه `flutter_ping_watcher/`)
+## ساختار جدید پروژه
 
----
+- `pingwatcher/models.py`: مدل‌های داده (`PingResult`, `MonitoringStats`)
+- `pingwatcher/settings.py`: مدیریت تنظیمات و persistence
+- `pingwatcher/ping.py`: ساخت دستور ping + parser + worker thread
+- `pingwatcher/widgets.py`: ویجت‌های قابل‌استفاده مجدد (نمودار و پنل آمار)
+- `pingwatcher/main_window.py`: orchestration لایه‌ی UI و رفتارها
+- `pingwatcher/app.py`: entrypoint اپلیکیشن
+- `ping_watcher.py`: اجرای مستقیم برنامه (backward-compatible)
 
-## Android (Flutter)
+## ویژگی‌ها
 
-### امکانات نسخه Flutter
-- داشبورد جذاب با گرادیانت و کارت‌های شیشه‌ای (Glass UI)
-- نمودار latency با `fl_chart`
-- مانیتورینگ تکی (Single Host)
-- مانیتورینگ DNS تکی/چندتایی (Start Selected / Start All)
-- لیست DNSهای داخلی و خارجی
-- تاریخچه وضعیت و latency
-- تنظیمات (Dark Mode + Interval) با ذخیره در `SharedPreferences`
+- کد تمیزتر، کلاس‌های کوچک‌تر و مسئولیت‌های واضح‌تر.
+- سازگاری بهتر ping بین Windows/Linux/macOS و محیط‌های Android-like.
+- نمودار latency + نمایش failure marker.
+- آمار کامل: total/success/failed/rate/avg/min/max/jitter.
+- تاریخچه با خروجی CSV/JSON.
+- تنظیمات پایدار در `~/.ping_watcher_settings.json`.
 
-### اجرا
-```bash
-cd flutter_ping_watcher
-flutter pub get
-flutter run
-```
-
-### ساخت APK
-```bash
-cd flutter_ping_watcher
-flutter build apk --release
-```
-
----
-
-## Desktop (PyQt)
+## اجرا
 
 ```bash
 pip install PyQt5
@@ -46,3 +34,7 @@ python ping_watcher.py
 pip install pyinstaller
 pyinstaller --noconfirm --onefile --windowed --name PingWatcher ping_watcher.py
 ```
+
+## مسیر اندروید
+
+برای Android پیشنهاد می‌شود UI را با Kivy/Buildozer بسازید و منطق مشترک را از ماژول‌های `pingwatcher/` reuse کنید.

@@ -3,8 +3,6 @@ import json
 import re
 from pathlib import Path
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QFileDialog,
     QGridLayout,
@@ -15,7 +13,6 @@ from PyQt5.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
-    QComboBox,
     QSpinBox,
     QTabWidget,
     QTableWidget,
@@ -24,10 +21,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from .dns import DEFAULT_DNS_TARGETS
 from .models import MonitoringStats, PingResult
 from .ping import PingWorker
-from .settings import SettingsStore
+from .settings import AppSettings, SettingsStore
 from .widgets import LatencyGraph, StatsPanel
 
 
@@ -38,14 +34,12 @@ class MainWindow(QMainWindow):
         self._settings = settings_store.load()
 
         self._worker: PingWorker | None = None
-        self._dns_workers: dict[str, PingWorker] = {}
         self._history: list[PingResult] = []
         self._stats = MonitoringStats()
         self._last_online_status: bool | None = None
-        self._dns_row_by_address: dict[str, int] = {}
 
-        self.setWindowTitle("Ping Watcher Pro · Visual Network Monitor")
-        self.resize(1260, 820)
+        self.setWindowTitle("Ping Watcher Pro")
+        self.resize(1100, 760)
 
         self._build_ui()
         self._apply_theme()
@@ -57,7 +51,6 @@ class MainWindow(QMainWindow):
 
         self._tabs = QTabWidget()
         self._tabs.addTab(self._build_monitor_tab(), "Monitor")
-        self._tabs.addTab(self._build_dns_tab(), "DNS Monitor")
         self._tabs.addTab(self._build_history_tab(), "History")
         self._tabs.addTab(self._build_settings_tab(), "Settings")
 
@@ -70,12 +63,6 @@ class MainWindow(QMainWindow):
         controls = QHBoxLayout()
         self._address_input = QLineEdit()
         self._address_input.setPlaceholderText("IP / domain (e.g. 8.8.8.8 or google.com)")
-
-        self._dns_quick_select = QComboBox()
-        self._dns_quick_select.addItem("Quick DNS…", "")
-        for target in DEFAULT_DNS_TARGETS:
-            self._dns_quick_select.addItem(f"{target.name} ({target.address})", target.address)
-        self._dns_quick_select.currentIndexChanged.connect(self._apply_quick_dns)
 
         self._start_btn = QPushButton("Start")
         self._pause_btn = QPushButton("Pause")
@@ -91,65 +78,19 @@ class MainWindow(QMainWindow):
         self._stop_btn.setEnabled(False)
 
         controls.addWidget(self._address_input, 3)
-        controls.addWidget(self._dns_quick_select, 2)
         controls.addWidget(self._start_btn)
         controls.addWidget(self._pause_btn)
         controls.addWidget(self._stop_btn)
         controls.addWidget(self._theme_btn)
 
         self._status_label = QLabel("Ready")
-        self._status_label.setObjectName("statusLabel")
-
-        self._graph = LatencyGraph(max_points=140)
+        self._graph = LatencyGraph()
         self._stats_panel = StatsPanel()
 
         layout.addLayout(controls)
         layout.addWidget(self._status_label)
         layout.addWidget(self._graph)
         layout.addWidget(self._stats_panel)
-        return container
-
-    def _build_dns_tab(self) -> QWidget:
-        container = QWidget()
-        layout = QVBoxLayout(container)
-
-        top = QHBoxLayout()
-        self._dns_filter_combo = QComboBox()
-        self._dns_filter_combo.addItems(["all", "external", "internal"])
-        self._dns_filter_combo.currentTextChanged.connect(self._refresh_dns_table)
-
-        self._dns_start_selected_btn = QPushButton("Start Selected")
-        self._dns_stop_selected_btn = QPushButton("Stop Selected")
-        self._dns_start_all_btn = QPushButton("Start All")
-        self._dns_stop_all_btn = QPushButton("Stop All")
-        self._dns_load_to_single_btn = QPushButton("Load Selected to Single Monitor")
-
-        self._dns_start_selected_btn.clicked.connect(self._start_selected_dns)
-        self._dns_stop_selected_btn.clicked.connect(self._stop_selected_dns)
-        self._dns_start_all_btn.clicked.connect(self._start_all_dns)
-        self._dns_stop_all_btn.clicked.connect(self._stop_all_dns)
-        self._dns_load_to_single_btn.clicked.connect(self._load_selected_dns_to_single)
-
-        top.addWidget(QLabel("Group:"))
-        top.addWidget(self._dns_filter_combo)
-        top.addStretch()
-        top.addWidget(self._dns_start_selected_btn)
-        top.addWidget(self._dns_stop_selected_btn)
-        top.addWidget(self._dns_start_all_btn)
-        top.addWidget(self._dns_stop_all_btn)
-        top.addWidget(self._dns_load_to_single_btn)
-
-        self._dns_table = QTableWidget(0, 8)
-        self._dns_table.setHorizontalHeaderLabels(
-            ["Select", "Name", "Address", "Group", "Status", "Latency", "Last Check", "Mode"]
-        )
-        self._dns_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self._dns_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-
-        layout.addLayout(top)
-        layout.addWidget(self._dns_table)
-
-        self._refresh_dns_table()
         return container
 
     def _build_history_tab(self) -> QWidget:
@@ -206,123 +147,6 @@ class MainWindow(QMainWindow):
         grid.addWidget(save_btn, 3, 0, 1, 2)
 
         return container
-
-    def _apply_quick_dns(self):
-        addr = self._dns_quick_select.currentData()
-        if addr:
-            self._address_input.setText(addr)
-
-    def _refresh_dns_table(self) -> None:
-        self._dns_table.setRowCount(0)
-        self._dns_row_by_address.clear()
-
-        filter_name = self._dns_filter_combo.currentText() if hasattr(self, "_dns_filter_combo") else "all"
-        targets = [
-            t for t in DEFAULT_DNS_TARGETS
-            if filter_name == "all" or t.group == filter_name
-        ]
-
-        for target in targets:
-            row = self._dns_table.rowCount()
-            self._dns_table.insertRow(row)
-
-            selected_item = QTableWidgetItem()
-            selected_item.setCheckState(Qt.Unchecked)
-            self._dns_table.setItem(row, 0, selected_item)
-            self._dns_table.setItem(row, 1, QTableWidgetItem(target.name))
-            self._dns_table.setItem(row, 2, QTableWidgetItem(target.address))
-            self._dns_table.setItem(row, 3, QTableWidgetItem(target.group))
-            self._dns_table.setItem(row, 4, QTableWidgetItem("Idle"))
-            self._dns_table.setItem(row, 5, QTableWidgetItem("—"))
-            self._dns_table.setItem(row, 6, QTableWidgetItem("—"))
-            self._dns_table.setItem(row, 7, QTableWidgetItem("Single/Batch"))
-            self._dns_row_by_address[target.address] = row
-
-    def _selected_dns_addresses(self) -> list[str]:
-        addresses: list[str] = []
-        for row in range(self._dns_table.rowCount()):
-            is_checked = self._dns_table.item(row, 0).checkState() == Qt.Checked
-            if is_checked:
-                addresses.append(self._dns_table.item(row, 2).text())
-        return addresses
-
-    def _start_selected_dns(self) -> None:
-        self._start_dns_workers(self._selected_dns_addresses())
-
-    def _stop_selected_dns(self) -> None:
-        self._stop_dns_workers(self._selected_dns_addresses())
-
-    def _start_all_dns(self) -> None:
-        addresses = [self._dns_table.item(row, 2).text() for row in range(self._dns_table.rowCount())]
-        self._start_dns_workers(addresses)
-
-    def _stop_all_dns(self) -> None:
-        self._stop_dns_workers(list(self._dns_workers.keys()))
-
-    def _load_selected_dns_to_single(self) -> None:
-        addresses = self._selected_dns_addresses()
-        if not addresses:
-            QMessageBox.information(self, "No selection", "حداقل یک DNS را انتخاب کنید.")
-            return
-        self._address_input.setText(addresses[0])
-        self._tabs.setCurrentIndex(0)
-
-    def _start_dns_workers(self, addresses: list[str]) -> None:
-        if not addresses:
-            QMessageBox.information(self, "No selection", "هیچ DNS انتخاب نشده است.")
-            return
-
-        for address in addresses:
-            if address in self._dns_workers:
-                continue
-
-            worker = PingWorker(
-                address=address,
-                interval_ms=self._settings.interval_ms,
-                timeout_ms=self._settings.timeout_ms,
-                packet_count=self._settings.packet_count,
-            )
-            worker.result_ready.connect(lambda result, addr=address: self._handle_dns_result(addr, result))
-            worker.start()
-            self._dns_workers[address] = worker
-            self._mark_dns_row_state(address, "Running", QColor("#D29922"), mode="Batch")
-
-    def _stop_dns_workers(self, addresses: list[str]) -> None:
-        for address in addresses:
-            worker = self._dns_workers.get(address)
-            if worker is None:
-                continue
-            worker.stop()
-            worker.wait()
-            del self._dns_workers[address]
-            self._mark_dns_row_state(address, "Stopped", QColor("#6E7781"), mode="Batch")
-
-    def _handle_dns_result(self, address: str, result: PingResult) -> None:
-        self._mark_dns_row_ping_data(address, result)
-
-    def _mark_dns_row_state(self, address: str, text: str, color: QColor, mode: str) -> None:
-        row = self._dns_row_by_address.get(address)
-        if row is None:
-            return
-        status_item = self._dns_table.item(row, 4)
-        status_item.setText(text)
-        status_item.setForeground(color)
-        self._dns_table.item(row, 7).setText(mode)
-
-    def _mark_dns_row_ping_data(self, address: str, result: PingResult) -> None:
-        row = self._dns_row_by_address.get(address)
-        if row is None:
-            return
-
-        if result.success:
-            self._mark_dns_row_state(address, "Online ✅", QColor("#3FB950"), mode="Batch")
-            latency = f"{result.latency_ms:.1f} ms" if result.latency_ms is not None else "—"
-        else:
-            self._mark_dns_row_state(address, "Offline ❌", QColor("#F85149"), mode="Batch")
-            latency = "—"
-
-        self._dns_table.item(row, 5).setText(latency)
-        self._dns_table.item(row, 6).setText(result.timestamp.strftime("%H:%M:%S"))
 
     def start_monitoring(self) -> None:
         address = self._address_input.text().strip()
@@ -443,24 +267,20 @@ class MainWindow(QMainWindow):
 
         if dark:
             self.setStyleSheet(
-                "QWidget { background:#0D1117; color:#E6EDF3; font-family:'Segoe UI'; }"
-                "QLineEdit, QTableWidget, QTabWidget::pane, QFrame, QComboBox { background:#161B22; border:1px solid #30363D; border-radius:8px; }"
-                "QPushButton { background:#21262D; border:1px solid #30363D; padding:8px 10px; border-radius:8px; }"
-                "QPushButton:hover { background:#30363D; }"
-                "QHeaderView::section { background:#1C2230; border:none; color:#8B949E; padding:8px; }"
-                "QTableWidget::item:selected { background:#1f2937; }"
-                "#statusLabel { font-size:14px; font-weight:600; color:#58A6FF; padding:4px; }"
+                "QWidget { background:#0d1117; color:#e6edf3; }"
+                "QLineEdit, QTableWidget, QTabWidget::pane, QFrame { background:#161b22; border:1px solid #30363d; }"
+                "QPushButton { background:#21262d; border:1px solid #30363d; padding:8px 10px; }"
+                "QPushButton:hover { background:#30363d; }"
+                "QHeaderView::section { background:#1c2230; border:none; color:#8b949e; }"
             )
             return
 
         self.setStyleSheet(
-            "QWidget { background:#F6F8FA; color:#24292F; font-family:'Segoe UI'; }"
-            "QLineEdit, QTableWidget, QTabWidget::pane, QFrame, QComboBox { background:#FFFFFF; border:1px solid #D0D7DE; border-radius:8px; }"
-            "QPushButton { background:#F3F4F6; border:1px solid #D0D7DE; padding:8px 10px; border-radius:8px; }"
-            "QPushButton:hover { background:#EAEEF2; }"
-            "QHeaderView::section { background:#FFFFFF; border:none; color:#57606A; padding:8px; }"
-            "QTableWidget::item:selected { background:#DFEBF7; }"
-            "#statusLabel { font-size:14px; font-weight:600; color:#0969DA; padding:4px; }"
+            "QWidget { background:#f6f8fa; color:#24292f; }"
+            "QLineEdit, QTableWidget, QTabWidget::pane, QFrame { background:#ffffff; border:1px solid #d0d7de; }"
+            "QPushButton { background:#f3f4f6; border:1px solid #d0d7de; padding:8px 10px; }"
+            "QPushButton:hover { background:#eaeef2; }"
+            "QHeaderView::section { background:#ffffff; border:none; color:#57606a; }"
         )
 
     def export_csv(self) -> None:
@@ -523,6 +343,5 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self.stop_monitoring()
-        self._stop_all_dns()
         self._settings_store.save(self._settings)
         event.accept()
