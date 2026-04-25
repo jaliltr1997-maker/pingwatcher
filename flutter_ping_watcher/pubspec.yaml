@@ -1,7 +1,7 @@
 name: ping_watcher_android
 description: Visual DNS and internet quality monitor for Android.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
