@@ -1,39 +1,40 @@
 # Ping Watcher Pro
 
-A refreshed PyQt5 network monitor with improved reliability, settings persistence, history export, and a ping engine that handles Windows, Linux/macOS, and Android-style ping flags.
+نسخه‌ی refactor شده با رویکرد **Clean Code** و معماری ماژولار.
 
-## Features added
+## ساختار جدید پروژه
 
-- Better ping command compatibility (`Windows`, `Linux/macOS`, `Android`-style environments).
-- Safer latency parsing and timeout handling.
-- Input validation for IP/domain.
-- Stats improvements (success rate, min/max/avg/jitter).
-- History export to **CSV** and **JSON**.
-- Persistent settings and theme mode.
-- Cleaner UX with Monitor / History / Settings tabs.
+- `pingwatcher/models.py`: مدل‌های داده (`PingResult`, `MonitoringStats`)
+- `pingwatcher/settings.py`: مدیریت تنظیمات و persistence
+- `pingwatcher/ping.py`: ساخت دستور ping + parser + worker thread
+- `pingwatcher/widgets.py`: ویجت‌های قابل‌استفاده مجدد (نمودار و پنل آمار)
+- `pingwatcher/main_window.py`: orchestration لایه‌ی UI و رفتارها
+- `pingwatcher/app.py`: entrypoint اپلیکیشن
+- `ping_watcher.py`: اجرای مستقیم برنامه (backward-compatible)
 
-## Run (desktop)
+## ویژگی‌ها
+
+- کد تمیزتر، کلاس‌های کوچک‌تر و مسئولیت‌های واضح‌تر.
+- سازگاری بهتر ping بین Windows/Linux/macOS و محیط‌های Android-like.
+- نمودار latency + نمایش failure marker.
+- آمار کامل: total/success/failed/rate/avg/min/max/jitter.
+- تاریخچه با خروجی CSV/JSON.
+- تنظیمات پایدار در `~/.ping_watcher_settings.json`.
+
+## اجرا
 
 ```bash
 pip install PyQt5
 python ping_watcher.py
 ```
 
-## Build for Windows
+## ساخت خروجی ویندوز
 
 ```bash
 pip install pyinstaller
 pyinstaller --noconfirm --onefile --windowed --name PingWatcher ping_watcher.py
 ```
 
-Output executable is generated in `dist/PingWatcher.exe`.
+## مسیر اندروید
 
-## Android path (recommended)
-
-PyQt5 is not the best native Android target. Recommended architecture:
-
-1. Keep this project as the monitoring core and desktop app.
-2. Reuse the ping/business logic in a shared Python module.
-3. Build Android UI with **Kivy + Buildozer** (or Flutter/React Native app with a Python/HTTP backend).
-
-If you want, the next step can be generating a Kivy Android client that uses the same stats/history model.
+برای Android پیشنهاد می‌شود UI را با Kivy/Buildozer بسازید و منطق مشترک را از ماژول‌های `pingwatcher/` reuse کنید.
